@@ -36,14 +36,25 @@ export const ContentPostSchema = z.object({
   validation: ValidationSchema,
 });
 
+export const ContextStatusSchema = z.object({
+  weather: z.enum(["available", "unavailable"]),
+  weatherContextCount: z.number().int().min(0),
+  warnings: z.array(z.string()),
+});
+
 export const ContentPlanSchema = z.object({
   merchantId: z.string().min(1),
   merchantName: z.string().min(1),
   generatedAt: z.string(),
+  contextStatus: ContextStatusSchema,
   posts: z.array(ContentPostSchema).length(5),
 });
 
 export type Evidence = z.infer<typeof EvidenceSchema>;
 export type Validation = z.infer<typeof ValidationSchema>;
-export type ContentPost = z.infer<typeof ContentPostSchema>;
-export type ContentPlan = z.infer<typeof ContentPlanSchema>;
+export type ContentPost = z.infer<
+  typeof ContentPostSchema
+>;
+export type ContentPlan = z.infer<
+  typeof ContentPlanSchema
+>;

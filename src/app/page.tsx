@@ -18,6 +18,16 @@ function getLocalDateString(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+function getTomorrowDateString(): string {
+  const tomorrow = new Date();
+
+  tomorrow.setDate(
+    tomorrow.getDate() + 1,
+  );
+
+  return getLocalDateString(tomorrow);
+}
+
 function PlanImage({
   src,
   alt,
@@ -51,7 +61,7 @@ function PlanImage({
 
 export default function Home() {
   const [startDate, setStartDate] = useState(
-    getLocalDateString(new Date()),
+    getTomorrowDateString(),
   );
 
   const [contentPlan, setContentPlan] =
@@ -169,6 +179,35 @@ export default function Home() {
             <p className="mt-2 text-sm text-zinc-500">
               {contentPlan.posts.length} propositions de contenu
             </p>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+              <span
+                className={
+                  contentPlan.contextStatus.weather === "available"
+                    ? "rounded-full bg-emerald-100 px-3 py-1 font-medium text-emerald-800"
+                    : "rounded-full bg-amber-100 px-3 py-1 font-medium text-amber-800"
+                }
+              >
+                Météo:{" "}
+                {contentPlan.contextStatus.weather === "available"
+                  ? "disponible"
+                  : "indisponible"}
+              </span>
+
+              <span className="text-zinc-500">
+                {contentPlan.contextStatus.weatherContextCount} publication(s)
+                enrichie(s)
+              </span>
+            </div>
+
+            {contentPlan.contextStatus.warnings.map((warning) => (
+              <p
+                key={warning}
+                className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+              >
+                {warning}
+              </p>
+            ))}
           </div>
 
           <div className="grid gap-7 lg:grid-cols-2">
@@ -218,6 +257,20 @@ export default function Home() {
                         {post.objective}
                       </p>
                     </div>
+
+                    {post.context.length > 0 && (
+                      <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">
+                          Contexte local utilisé
+                        </p>
+
+                        <ul className="mt-2 space-y-1 text-sm text-sky-900">
+                          {post.context.map((context) => (
+                            <li key={context}>{context}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                     <div className="mt-5 rounded-xl bg-zinc-50 p-4">
                       <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
