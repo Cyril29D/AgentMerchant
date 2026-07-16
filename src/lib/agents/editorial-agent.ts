@@ -1,6 +1,7 @@
 import { addDays, format } from "date-fns";
 
 import type { WeatherContext } from "@/lib/agents/context-agent";
+import type { NewsContext } from "@/lib/agents/news-agent";
 import type { CalendarContext } from "@/lib/agents/season-agent";
 import type { Evidence } from "@/lib/schemas/content-plan";
 import type { Merchant } from "@/lib/schemas/merchant";
@@ -195,11 +196,90 @@ function enrichDraftsWithCalendar(
   });
 }
 
+function isNewsRelevantForDraft(
+  draft: EditorialDraft,
+  newsContext: NewsContext,
+): boolean {
+  const draftText = normalize(
+    `${draft.topic} ${draft.objective} ${draft.caption}`,
+  );
+
+  return newsContext.relevantTerms.some(
+    (term) =>
+      draftText.includes(normalize(term)),
+  );
+}
+
+function enrichDraftsWithNews(
+  drafts: EditorialDraft[],
+  newsContexts: NewsContext[],
+): EditorialDraft[] {
+  let newsPublicationCount = 0;
+  const usedArticleIds =
+    new Set<string>();
+
+  return drafts.map((draft) => {
+    /*
+     * Une seule publication liée à l’actualité
+     * suffit pour le prototype.
+     */
+    if (newsPublicationCount >= 1) {
+      return draft;
+    }
+
+    /*
+     * On évite de mélanger plusieurs contextes
+     * externes dans la même publication.
+     */
+    if (draft.context.length > 0) {
+      return draft;
+    }
+
+    const newsContext =
+      newsContexts.find(
+        (context) =>
+          !usedArticleIds.has(
+            context.articleId,
+          ) &&
+          isNewsRelevantForDraft(
+            draft,
+            context,
+          ),
+      );
+
+    if (!newsContext) {
+      return draft;
+    }
+
+    newsPublicationCount += 1;
+
+    usedArticleIds.add(
+      newsContext.articleId,
+    );
+
+    return {
+      ...draft,
+      caption:
+        `${newsContext.captionLead} ` +
+        `${draft.caption}`,
+      context: [
+        ...draft.context,
+        newsContext.summary,
+      ],
+      evidence: [
+        ...draft.evidence,
+        newsContext.evidence,
+      ],
+    };
+  });
+}
+
 export function buildEditorialDrafts(
   merchant: Merchant,
   startDate: Date,
   weatherContexts: WeatherContext[] = [],
   calendarContexts: CalendarContext[] = [],
+  newsContexts: NewsContext[] = [],
 ): EditorialDraft[] {
   const products = merchant.products.filter(
     (product) => product.verified,
@@ -319,8 +399,14 @@ export function buildEditorialDrafts(
       weatherContexts,
     );
 
-  return enrichDraftsWithCalendar(
-    weatherEnrichedDrafts,
-    calendarContexts,
+  const calendarEnrichedDrafts =
+    enrichDraftsWithCalendar(
+      weatherEnrichedDrafts,
+      calendarContexts,
+    );
+
+  return enrichDraftsWithNews(
+    calendarEnrichedDrafts,
+    newsContexts,
   );
 }

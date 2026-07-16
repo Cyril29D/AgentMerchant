@@ -83,6 +83,19 @@ export function validatePost(
   ]);
 
   for (const evidence of post.evidence) {
+    if (
+      evidence.sourceType === "news" &&
+      (
+        !evidence.sourceUrl ||
+        !evidence.sourceName ||
+        !evidence.publishedAt
+      )
+    ) {
+      warnings.push(
+        "Une actualité utilisée ne possède pas toutes ses informations de traçabilité.",
+      );
+    }
+
     const externalSource = [
       "weather",
       "news",

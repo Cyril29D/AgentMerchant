@@ -6,6 +6,10 @@ import {
   type WeatherContext,
 } from "@/lib/agents/context-agent";
 import { buildEditorialDrafts } from "@/lib/agents/editorial-agent";
+import {
+  buildNewsContexts,
+  type NewsContext,
+} from "@/lib/agents/news-agent";
 import { buildCalendarContexts } from "@/lib/agents/season-agent";
 import { validatePost } from "@/lib/agents/validator-agent";
 import { selectBestPhoto } from "@/lib/agents/visual-agent";
@@ -16,6 +20,7 @@ import {
 import { MerchantSchema } from "@/lib/schemas/merchant";
 import { PhotoLibrarySchema } from "@/lib/schemas/photo";
 import { getCalendarDays } from "@/lib/services/calendar-service";
+import { getNewsArticles } from "@/lib/services/news-service";
 import { getWeatherForecast } from "@/lib/services/weather-service";
 
 async function readJsonFile(
@@ -79,12 +84,70 @@ export async function POST(
     const photos =
       PhotoLibrarySchema.parse(rawPhotos);
 
+    const contextWarnings: string[] = [];
+
+    let newsStatus:
+      | "available"
+      | "unavailable" = "available";
+
+    let newsCandidateCount = 0;
+    let newsContexts: NewsContext[] = [];
+
+    try {
+      const merchantKeywords = [
+        ...merchant.products
+          .filter(
+            (product) => product.verified,
+          )
+          .map((product) => product.name),
+
+        ...merchant.services
+          .filter(
+            (service) => service.verified,
+          )
+          .map((service) => service.name),
+      ];
+
+      const newsArticles =
+        await getNewsArticles({
+          city: merchant.city,
+          businessType:
+            merchant.businessType,
+          keywords: merchantKeywords,
+          lookbackDays: 7,
+          maximumResults: 20,
+        });
+
+      newsCandidateCount =
+        newsArticles.length;
+
+      newsContexts = buildNewsContexts(
+        merchant,
+        newsArticles,
+      );
+    } catch (newsError) {
+      newsStatus = "unavailable";
+
+      const message =
+        newsError instanceof Error
+          ? newsError.message
+          : "Erreur d’actualités inconnue.";
+
+      contextWarnings.push(
+        `Les actualités n’ont pas pu être récupérées : ${message}`,
+      );
+
+      console.warn(
+        "News retrieval failed:",
+        newsError,
+      );
+    }
+
     let weatherStatus:
       | "available"
       | "unavailable" = "available";
 
     let weatherContexts: WeatherContext[] = [];
-    const contextWarnings: string[] = [];
 
     try {
       const forecast = await getWeatherForecast(
@@ -135,6 +198,7 @@ export async function POST(
       startDate,
       weatherContexts,
       calendarContexts,
+      newsContexts,
     );
 
     const usedPhotoIds = new Set<string>();
@@ -198,6 +262,14 @@ export async function POST(
         ),
       ).length;
 
+    const newsContextCount =
+      posts.filter((post) =>
+        post.evidence.some(
+          (evidence) =>
+            evidence.sourceType === "news",
+        ),
+      ).length;
+
     const contentPlan =
       ContentPlanSchema.parse({
         merchantId: merchant.id,
@@ -206,8 +278,14 @@ export async function POST(
         contextStatus: {
           weather: weatherStatus,
           weatherContextCount,
+
           calendar: "available",
           calendarContextCount,
+
+          news: newsStatus,
+          newsCandidateCount,
+          newsContextCount,
+
           warnings: contextWarnings,
         },
         posts,

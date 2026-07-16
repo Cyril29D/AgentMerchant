@@ -10,8 +10,13 @@ export const EvidenceSchema = z.object({
     "news",
     "season",
   ]),
+
   sourceId: z.string().min(1),
   claim: z.string().min(1),
+
+  sourceName: z.string().min(1).optional(),
+  sourceUrl: z.string().url().optional(),
+  publishedAt: z.string().datetime().optional(),
 });
 
 export const ValidationSchema = z.object({
@@ -50,6 +55,21 @@ export const ContextStatusSchema = z.object({
   calendar: z.literal("available"),
 
   calendarContextCount: z
+    .number()
+    .int()
+    .min(0),
+
+  news: z.enum([
+    "available",
+    "unavailable",
+  ]),
+
+  newsCandidateCount: z
+    .number()
+    .int()
+    .min(0),
+
+  newsContextCount: z
     .number()
     .int()
     .min(0),
