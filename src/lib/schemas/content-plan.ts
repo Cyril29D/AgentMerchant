@@ -74,6 +74,15 @@ export const ContextStatusSchema = z.object({
     .int()
     .min(0),
 
+  writer: z.enum([
+    "ai",
+    "fallback",
+  ]),
+
+  writerModel: z
+    .string()
+    .nullable(),
+
   warnings: z.array(z.string()),
 });
 

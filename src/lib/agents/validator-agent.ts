@@ -9,6 +9,63 @@ function containsPattern(text: string, patterns: RegExp[]): boolean {
   return patterns.some((pattern) => pattern.test(text));
 }
 
+function normalizeText(
+  value: string,
+): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("fr-FR");
+}
+
+interface RiskyClaim {
+  label: string;
+  pattern: RegExp;
+}
+
+const RISKY_CLAIMS: RiskyClaim[] = [
+  {
+    label: "fait maison",
+    pattern:
+      /\bfait(?:e|s)? maison\b/,
+  },
+  {
+    label: "préparation du jour",
+    pattern:
+      /\bprepare(?:e|es|s)? (?:ce matin|aujourd hui|sur place)\b/,
+  },
+  {
+    label: "fraîcheur",
+    pattern:
+      /\bfrais(?:e|es)?\b/,
+  },
+  {
+    label: "produit biologique",
+    pattern:
+      /\bbio(?:logique)?\b/,
+  },
+  {
+    label: "sans gluten",
+    pattern:
+      /\bsans gluten\b/,
+  },
+  {
+    label: "origine locale",
+    pattern:
+      /\blocal(?:e|es|aux)?\b/,
+  },
+  {
+    label: "produit végan",
+    pattern:
+      /\bvegan(?:e|es|s)?\b/,
+  },
+  {
+    label: "certification halal",
+    pattern:
+      /\bhalal\b/,
+  },
+];
+
 export function validatePost(
   post: Omit<ContentPost, "validation">,
   merchant: Merchant,
@@ -16,6 +73,62 @@ export function validatePost(
 ): Validation {
   const warnings: string[] = [];
   const normalizedCaption = post.caption.toLocaleLowerCase("fr-FR");
+
+  const normalizedVerifiedFacts =
+    normalizeText(
+      [
+        merchant.name,
+        merchant.businessType,
+        merchant.city,
+        merchant.description,
+
+        ...merchant.products
+          .filter(
+            (product) =>
+              product.verified,
+          )
+          .map(
+            (product) =>
+              product.name,
+          ),
+
+        ...merchant.services
+          .filter(
+            (service) =>
+              service.verified,
+          )
+          .map(
+            (service) =>
+              service.name,
+          ),
+
+        ...merchant.promotions
+          .filter(
+            (promotion) =>
+              promotion.verified,
+          )
+          .flatMap(
+            (promotion) => [
+              promotion.title,
+              promotion.description,
+            ],
+          ),
+
+        ...merchant.events
+          .filter(
+            (event) => event.verified,
+          )
+          .flatMap(
+            (event) => [
+              event.title,
+              event.description,
+            ],
+          ),
+      ].join(" "),
+    );
+
+  const normalizedGeneratedCaption =
+    normalizeText(post.caption);
 
   const hasVerifiedPromotion = merchant.promotions.some(
     (promotion) => promotion.verified,
@@ -62,6 +175,46 @@ export function validatePost(
   if (!hasVerifiedDelivery && /\blivraison\b/.test(normalizedCaption)) {
     warnings.push(
       "La publication mentionne un service de livraison non vérifié.",
+    );
+  }
+
+  for (const riskyClaim of RISKY_CLAIMS) {
+    const claimAppearsInCaption =
+      riskyClaim.pattern.test(
+        normalizedGeneratedCaption,
+      );
+
+    const claimExistsInFacts =
+      riskyClaim.pattern.test(
+        normalizedVerifiedFacts,
+      );
+
+    if (
+      claimAppearsInCaption &&
+      !claimExistsInFacts
+    ) {
+      warnings.push(
+        `La publication contient une affirmation non vérifiée : ${riskyClaim.label}.`,
+      );
+    }
+  }
+
+  const containsPrice =
+    /\b\d+(?:[.,]\d{1,2})?\s?€\b/.test(
+      post.caption,
+    );
+
+  const verifiedFactsContainPrice =
+    /\b\d+(?:[.,]\d{1,2})?\s?€\b/.test(
+      normalizedVerifiedFacts,
+    );
+
+  if (
+    containsPrice &&
+    !verifiedFactsContainPrice
+  ) {
+    warnings.push(
+      "La publication contient un prix qui n’est pas présent dans les données vérifiées.",
     );
   }
 

@@ -13,6 +13,7 @@ import {
 import { buildCalendarContexts } from "@/lib/agents/season-agent";
 import { validatePost } from "@/lib/agents/validator-agent";
 import { selectBestPhoto } from "@/lib/agents/visual-agent";
+import { writeEditorialDrafts } from "@/lib/agents/writer-agent";
 import {
   ContentPlanSchema,
   type ContentPost,
@@ -23,12 +24,26 @@ import { getCalendarDays } from "@/lib/services/calendar-service";
 import { getNewsArticles } from "@/lib/services/news-service";
 import { getWeatherForecast } from "@/lib/services/weather-service";
 
-async function readJsonFile(
-  relativePath: string,
-): Promise<unknown> {
+async function readMerchantFile(): Promise<unknown> {
   const absolutePath = join(
     process.cwd(),
-    relativePath,
+    "data",
+    "merchant.json",
+  );
+
+  const content = await readFile(
+    absolutePath,
+    "utf-8",
+  );
+
+  return JSON.parse(content) as unknown;
+}
+
+async function readPhotosFile(): Promise<unknown> {
+  const absolutePath = join(
+    process.cwd(),
+    "data",
+    "photos.json",
   );
 
   const content = await readFile(
@@ -70,13 +85,11 @@ export async function POST(
         .startDate,
     );
 
-    const rawMerchant = await readJsonFile(
-      "data/merchant.json",
-    );
+    const rawMerchant =
+      await readMerchantFile();
 
-    const rawPhotos = await readJsonFile(
-      "data/photos.json",
-    );
+    const rawPhotos =
+      await readPhotosFile();
 
     const merchant =
       MerchantSchema.parse(rawMerchant);
@@ -193,13 +206,29 @@ export async function POST(
         calendarDays,
       );
 
-    const drafts = buildEditorialDrafts(
-      merchant,
-      startDate,
-      weatherContexts,
-      calendarContexts,
-      newsContexts,
-    );
+    const deterministicDrafts =
+      buildEditorialDrafts(
+        merchant,
+        startDate,
+        weatherContexts,
+        calendarContexts,
+        newsContexts,
+      );
+
+    const writerResult =
+      await writeEditorialDrafts(
+        merchant,
+        deterministicDrafts,
+      );
+
+    if (writerResult.warning) {
+      contextWarnings.push(
+        writerResult.warning,
+      );
+    }
+
+    const drafts =
+      writerResult.drafts;
 
     const usedPhotoIds = new Set<string>();
 
@@ -285,6 +314,9 @@ export async function POST(
           news: newsStatus,
           newsCandidateCount,
           newsContextCount,
+
+          writer: writerResult.mode,
+          writerModel: writerResult.model,
 
           warnings: contextWarnings,
         },

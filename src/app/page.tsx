@@ -234,6 +234,29 @@ export default function Home() {
                 } publication(s) enrichie(s)
               </span>
 
+              <span
+                className={
+                  contentPlan.contextStatus.writer ===
+                  "ai"
+                    ? "rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-800"
+                    : "rounded-full bg-zinc-200 px-3 py-1 font-medium text-zinc-700"
+                }
+              >
+                Rédaction :{" "}
+                {contentPlan.contextStatus.writer ===
+                "ai"
+                  ? `IA${
+                      contentPlan.contextStatus
+                        .writerModel
+                        ? ` · ${
+                            contentPlan.contextStatus
+                              .writerModel
+                          }`
+                        : ""
+                    }`
+                  : "mode de secours"}
+              </span>
+
               <span className="text-zinc-500">
                 {contentPlan.contextStatus.weatherContextCount} publication(s)
                 enrichie(s)
