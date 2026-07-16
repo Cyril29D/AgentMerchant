@@ -1,65 +1,299 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
+
+import type { ContentPlan } from "@/lib/schemas/content-plan";
+
+interface ApiError {
+  error?: string;
+  details?: string;
+}
+
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function PlanImage({
+  src,
+  alt,
+}: {
+  src: string | null;
+  alt: string;
+}) {
+  const [hasFailed, setHasFailed] = useState(false);
+
+  if (!src || hasFailed) {
+    return (
+      <div className="flex h-52 items-center justify-center bg-zinc-100 px-6 text-center text-sm text-zinc-500">
+        Aucun fichier image disponible pour ce visuel.
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative h-52 overflow-hidden bg-zinc-100">
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className="object-cover"
+        sizes="(max-width: 768px) 100vw, 50vw"
+        onError={() => setHasFailed(true)}
+      />
+    </div>
+  );
+}
 
 export default function Home() {
+  const [startDate, setStartDate] = useState(
+    getLocalDateString(new Date()),
+  );
+
+  const [contentPlan, setContentPlan] =
+    useState<ContentPlan | null>(null);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function generatePlan(): Promise<void> {
+    setIsLoading(true);
+    setError(null);
+    setContentPlan(null);
+
+    try {
+      const response = await fetch("/api/generate-plan", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          startDate,
+        }),
+      });
+
+      const result = (await response.json()) as ContentPlan | ApiError;
+
+      if (!response.ok) {
+        const apiError = result as ApiError;
+
+        throw new Error(
+          apiError.details ??
+            apiError.error ??
+            "Le planning n’a pas pu être généré.",
+        );
+      }
+
+      setContentPlan(result as ContentPlan);
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Une erreur inconnue est survenue.";
+
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="min-h-screen bg-zinc-50 text-zinc-950">
+      <section className="border-b border-zinc-200 bg-white">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+            Agent merchant
           </p>
+
+          <h1 className="max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl">
+            Cinq jours de contenu pour un commerce local
+          </h1>
+
+          <p className="mt-5 max-w-2xl text-lg leading-8 text-zinc-600">
+            Le prototype analyse les informations vérifiées du
+            commerçant, prépare un planning éditorial et sélectionne
+            les visuels les plus pertinents.
+          </p>
+
+          <div className="mt-10 flex max-w-xl flex-col gap-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-5 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-2 text-sm font-medium">
+              Date de début
+
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="rounded-lg border border-zinc-300 bg-white px-4 py-3 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+            </label>
+
+            <button
+              type="button"
+              onClick={generatePlan}
+              disabled={isLoading || !startDate}
+              className="rounded-lg bg-blue-700 px-6 py-3 font-semibold text-white transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+            >
+              {isLoading
+                ? "Génération..."
+                : "Générer le planning"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="mt-6 max-w-xl rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <p className="font-semibold">
+                La génération a échoué
+              </p>
+
+              <p className="mt-1">{error}</p>
+            </div>
+          )}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+
+      {contentPlan ? (
+        <section className="mx-auto max-w-6xl px-6 py-12">
+          <div className="mb-8">
+            <p className="text-sm font-medium text-zinc-500">
+              Planning généré pour
+            </p>
+
+            <h2 className="mt-1 text-3xl font-bold">
+              {contentPlan.merchantName}
+            </h2>
+
+            <p className="mt-2 text-sm text-zinc-500">
+              {contentPlan.posts.length} propositions de contenu
+            </p>
+          </div>
+
+          <div className="grid gap-7 lg:grid-cols-2">
+            {contentPlan.posts.map((post) => {
+              const isApproved =
+                post.validation.status === "approved";
+
+              return (
+                <article
+                  key={`${post.day}-${post.date}`}
+                  className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+                >
+                  <PlanImage
+                    src={post.imagePath}
+                    alt={post.topic}
+                  />
+
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-blue-700">
+                          Jour {post.day} · {post.date}
+                        </p>
+
+                        <h3 className="mt-1 text-2xl font-bold">
+                          {post.topic}
+                        </h3>
+                      </div>
+
+                      <span
+                        className={
+                          isApproved
+                            ? "rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800"
+                            : "rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800"
+                        }
+                      >
+                        {isApproved ? "Validé" : "Rejeté"}
+                      </span>
+                    </div>
+
+                    <div className="mt-5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Objectif
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-700">
+                        {post.objective}
+                      </p>
+                    </div>
+
+                    <div className="mt-5 rounded-xl bg-zinc-50 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Publication proposée
+                      </p>
+
+                      <p className="mt-2 leading-7 text-zinc-800">
+                        {post.caption}
+                      </p>
+                    </div>
+
+                    <div className="mt-5">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                        Visuel sélectionné
+                      </p>
+
+                      <p className="mt-1 text-sm text-zinc-700">
+                        {post.imageReason}
+                      </p>
+                    </div>
+
+                    <details className="mt-5 rounded-xl border border-zinc-200 p-4">
+                      <summary className="cursor-pointer text-sm font-semibold">
+                        Voir les preuves utilisées
+                      </summary>
+
+                      <div className="mt-4 space-y-3">
+                        {post.evidence.map((evidence) => (
+                          <div
+                            key={`${evidence.sourceType}-${evidence.sourceId}`}
+                            className="rounded-lg bg-zinc-50 p-3 text-sm"
+                          >
+                            <p className="font-semibold text-zinc-800">
+                              {evidence.sourceType}
+                            </p>
+
+                            <p className="mt-1 text-zinc-600">
+                              {evidence.claim}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+
+                    {!isApproved && (
+                      <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4">
+                        <p className="text-sm font-semibold text-red-800">
+                          Problèmes détectés
+                        </p>
+
+                        <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-red-700">
+                          {post.validation.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-6xl px-6 py-16">
+          <div className="rounded-2xl border border-dashed border-zinc-300 bg-white p-12 text-center">
+            <h2 className="text-xl font-semibold">
+              Aucun planning généré
+            </h2>
+
+            <p className="mt-2 text-zinc-500">
+              Choisis une date puis clique sur « Générer le planning ».
+            </p>
+          </div>
+        </section>
+      )}
+    </main>
   );
 }
