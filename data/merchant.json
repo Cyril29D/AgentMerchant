@@ -1,0 +1,49 @@
+{
+  "id": "merchant-001",
+  "name": "Boulangerie Martin",
+  "businessType": "Boulangerie artisanale",
+  "city": "Montpellier",
+  "description": "Boulangerie artisanale située dans le centre de Montpellier.",
+  "tone": "chaleureux et professionnel",
+  "products": [
+    {
+      "id": "product-croissant",
+      "name": "Croissants",
+      "verified": true
+    },
+    {
+      "id": "product-baguette",
+      "name": "Baguettes",
+      "verified": true
+    },
+    {
+      "id": "product-gateau",
+      "name": "Gâteaux",
+      "verified": true
+    }
+  ],
+  "services": [
+    {
+      "id": "service-terrasse",
+      "name": "Terrasse",
+      "verified": true
+    }
+  ],
+  "openingHours": {
+    "monday": "07:00-19:00",
+    "tuesday": "07:00-19:00",
+    "wednesday": "07:00-19:00",
+    "thursday": "07:00-19:00",
+    "friday": "07:00-19:00",
+    "saturday": "07:00-19:00",
+    "sunday": "closed"
+  },
+  "promotions": [],
+  "events": [],
+  "forbiddenClaims": [
+    "Ne pas parler de livraison",
+    "Ne pas inventer de promotion",
+    "Ne pas annoncer de produit absent de la liste",
+    "Ne pas inventer d'événement"
+  ]
+}
