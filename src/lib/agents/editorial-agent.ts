@@ -1,6 +1,7 @@
 import { addDays, format } from "date-fns";
 
 import type { WeatherContext } from "@/lib/agents/context-agent";
+import type { CalendarContext } from "@/lib/agents/season-agent";
 import type { Evidence } from "@/lib/schemas/content-plan";
 import type { Merchant } from "@/lib/schemas/merchant";
 
@@ -80,6 +81,17 @@ function isWeatherRelevantForDraft(
   );
 }
 
+function isCalendarRelevantForDraft(
+  draft: EditorialDraft,
+  calendarContext: CalendarContext,
+): boolean {
+  if (calendarContext.kind === "season") {
+    return isTerraceDraft(draft);
+  }
+
+  return true;
+}
+
 function enrichDraftsWithWeather(
   drafts: EditorialDraft[],
   weatherContexts: WeatherContext[],
@@ -131,10 +143,63 @@ function enrichDraftsWithWeather(
   });
 }
 
+function enrichDraftsWithCalendar(
+  drafts: EditorialDraft[],
+  calendarContexts: CalendarContext[],
+): EditorialDraft[] {
+  let calendarPublicationCount = 0;
+
+  return drafts.map((draft) => {
+    if (calendarPublicationCount >= 2) {
+      return draft;
+    }
+
+    /*
+     * On évite de mélanger météo et calendrier
+     * dans la même publication.
+     */
+    if (draft.context.length > 0) {
+      return draft;
+    }
+
+    const calendarContext =
+      calendarContexts.find(
+        (context) =>
+          context.date === draft.date &&
+          isCalendarRelevantForDraft(
+            draft,
+            context,
+          ),
+      );
+
+    if (!calendarContext) {
+      return draft;
+    }
+
+    calendarPublicationCount += 1;
+
+    return {
+      ...draft,
+      caption:
+        `${calendarContext.captionLead} ` +
+        `${draft.caption}`,
+      context: [
+        ...draft.context,
+        calendarContext.summary,
+      ],
+      evidence: [
+        ...draft.evidence,
+        calendarContext.evidence,
+      ],
+    };
+  });
+}
+
 export function buildEditorialDrafts(
   merchant: Merchant,
   startDate: Date,
   weatherContexts: WeatherContext[] = [],
+  calendarContexts: CalendarContext[] = [],
 ): EditorialDraft[] {
   const products = merchant.products.filter(
     (product) => product.verified,
@@ -248,8 +313,14 @@ export function buildEditorialDrafts(
     };
   });
 
-  return enrichDraftsWithWeather(
-    drafts,
-    weatherContexts,
+  const weatherEnrichedDrafts =
+    enrichDraftsWithWeather(
+      drafts,
+      weatherContexts,
+    );
+
+  return enrichDraftsWithCalendar(
+    weatherEnrichedDrafts,
+    calendarContexts,
   );
 }

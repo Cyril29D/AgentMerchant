@@ -194,6 +194,17 @@ export default function Home() {
                   : "indisponible"}
               </span>
 
+              <span className="rounded-full bg-violet-100 px-3 py-1 font-medium text-violet-800">
+                Calendrier : disponible
+              </span>
+
+              <span className="text-zinc-500">
+                {
+                  contentPlan.contextStatus
+                    .calendarContextCount
+                } publication(s) liée(s) au calendrier
+              </span>
+
               <span className="text-zinc-500">
                 {contentPlan.contextStatus.weatherContextCount} publication(s)
                 enrichie(s)

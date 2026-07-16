@@ -37,8 +37,23 @@ export const ContentPostSchema = z.object({
 });
 
 export const ContextStatusSchema = z.object({
-  weather: z.enum(["available", "unavailable"]),
-  weatherContextCount: z.number().int().min(0),
+  weather: z.enum([
+    "available",
+    "unavailable",
+  ]),
+
+  weatherContextCount: z
+    .number()
+    .int()
+    .min(0),
+
+  calendar: z.literal("available"),
+
+  calendarContextCount: z
+    .number()
+    .int()
+    .min(0),
+
   warnings: z.array(z.string()),
 });
 

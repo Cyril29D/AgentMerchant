@@ -6,6 +6,7 @@ import {
   type WeatherContext,
 } from "@/lib/agents/context-agent";
 import { buildEditorialDrafts } from "@/lib/agents/editorial-agent";
+import { buildCalendarContexts } from "@/lib/agents/season-agent";
 import { validatePost } from "@/lib/agents/validator-agent";
 import { selectBestPhoto } from "@/lib/agents/visual-agent";
 import {
@@ -14,6 +15,7 @@ import {
 } from "@/lib/schemas/content-plan";
 import { MerchantSchema } from "@/lib/schemas/merchant";
 import { PhotoLibrarySchema } from "@/lib/schemas/photo";
+import { getCalendarDays } from "@/lib/services/calendar-service";
 import { getWeatherForecast } from "@/lib/services/weather-service";
 
 async function readJsonFile(
@@ -117,10 +119,22 @@ export async function POST(
       );
     }
 
+    const calendarDays = getCalendarDays(
+      startDate,
+      5,
+    );
+
+    const calendarContexts =
+      buildCalendarContexts(
+        merchant,
+        calendarDays,
+      );
+
     const drafts = buildEditorialDrafts(
       merchant,
       startDate,
       weatherContexts,
+      calendarContexts,
     );
 
     const usedPhotoIds = new Set<string>();
@@ -176,6 +190,14 @@ export async function POST(
         ),
     ).length;
 
+    const calendarContextCount =
+      posts.filter((post) =>
+        post.evidence.some(
+          (evidence) =>
+            evidence.sourceType === "season",
+        ),
+      ).length;
+
     const contentPlan =
       ContentPlanSchema.parse({
         merchantId: merchant.id,
@@ -184,6 +206,8 @@ export async function POST(
         contextStatus: {
           weather: weatherStatus,
           weatherContextCount,
+          calendar: "available",
+          calendarContextCount,
           warnings: contextWarnings,
         },
         posts,
