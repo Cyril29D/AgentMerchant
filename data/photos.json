@@ -3,7 +3,8 @@
     "id": "photo-001",
     "filename": "croissants.jpg",
     "path": "/merchant-photos/croissants.jpg",
-    "description": "Plusieurs croissants dorés disposés dans une vitrine de boulangerie.",
+    "category": "product",
+    "description": "Plusieurs croissants disposés dans une vitrine de boulangerie.",
     "tags": [
       "croissant",
       "croissants",
@@ -16,6 +17,7 @@
     "id": "photo-002",
     "filename": "baguettes.jpg",
     "path": "/merchant-photos/baguettes.jpg",
+    "category": "product",
     "description": "Des baguettes de pain présentées dans la boulangerie.",
     "tags": [
       "baguette",
@@ -28,6 +30,7 @@
     "id": "photo-003",
     "filename": "gateaux.jpg",
     "path": "/merchant-photos/gateaux.jpg",
+    "category": "product",
     "description": "Plusieurs gâteaux présentés dans une vitrine.",
     "tags": [
       "gâteau",
@@ -41,11 +44,26 @@
     "id": "photo-004",
     "filename": "terrasse.jpg",
     "path": "/merchant-photos/terrasse.jpg",
+    "category": "service",
     "description": "La terrasse extérieure de la boulangerie avec des tables.",
     "tags": [
       "terrasse",
       "extérieur",
       "tables",
+      "commerce"
+    ]
+  },
+  {
+    "id": "photo-005",
+    "filename": "facade.jpg",
+    "path": "/merchant-photos/facade.jpg",
+    "category": "merchant",
+    "description": "La façade et la devanture de la boulangerie.",
+    "tags": [
+      "façade",
+      "devanture",
+      "enseigne",
+      "boulangerie",
       "commerce"
     ]
   }

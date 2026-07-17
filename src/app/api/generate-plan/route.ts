@@ -19,7 +19,10 @@ import {
   type ContentPost,
 } from "@/lib/schemas/content-plan";
 import { MerchantSchema } from "@/lib/schemas/merchant";
-import { PhotoLibrarySchema } from "@/lib/schemas/photo";
+import {
+  PhotoLibrarySchema,
+  type PhotoCategory,
+} from "@/lib/schemas/photo";
 import { getCalendarDays } from "@/lib/services/calendar-service";
 import { getNewsArticles } from "@/lib/services/news-service";
 import { getWeatherForecast } from "@/lib/services/weather-service";
@@ -70,6 +73,35 @@ function parseStartDate(value: unknown): Date {
   }
 
   return parsedDate;
+}
+
+function getPreferredPhotoCategory(
+  objective: string,
+): PhotoCategory {
+  if (
+    objective.startsWith(
+      "Mettre en avant le produit",
+    )
+  ) {
+    return "product";
+  }
+
+  if (
+    objective.startsWith(
+      "Présenter le service",
+    )
+  ) {
+    return "service";
+  }
+
+  if (
+    objective ===
+    "Présenter le commerce"
+  ) {
+    return "merchant";
+  }
+
+  return "ambience";
 }
 
 export async function POST(
@@ -241,11 +273,18 @@ export async function POST(
 
     const posts: ContentPost[] = drafts.map(
       (draft) => {
-        const visualSelection = selectBestPhoto(
-          photos,
-          `${draft.topic} ${draft.objective} ${draft.caption}`,
-          usedPhotoIds,
-        );
+        const preferredCategory =
+          getPreferredPhotoCategory(
+            draft.objective,
+          );
+
+        const visualSelection =
+          selectBestPhoto(
+            photos,
+            `${draft.topic} ${draft.objective} ${draft.caption}`,
+            usedPhotoIds,
+            preferredCategory,
+          );
 
         usedPhotoIds.add(
           visualSelection.photo.id,
