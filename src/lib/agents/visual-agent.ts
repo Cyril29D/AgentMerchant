@@ -172,7 +172,7 @@ export function selectBestPhoto(
       score: bestUnusedPhoto.score,
       reused: false,
       reason:
-        "Ce visuel inédit correspond au sujet, à sa catégorie et aux mots-clés de la publication.",
+        "Ce visuel correspond au sujet, à la catégorie attendue et aux mots-clés de la publication.",
     };
   }
 

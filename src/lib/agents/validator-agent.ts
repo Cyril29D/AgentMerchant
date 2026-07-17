@@ -55,6 +55,11 @@ const RISKY_CLAIMS: RiskyClaim[] = [
       /\b(?:experience unique|shopping unique)\b/,
   },
   {
+    label: "réputation non vérifiée",
+    pattern:
+      /\b(?:de predilection|incontournable|meilleur(?:e|s)?|prefere(?:e|s)?)\b/,
+  },
+  {
     label: "variété de produits",
     pattern:
       /\b(?:pour tous les gouts|large choix|grand choix|vaste choix|grande variete)\b/,

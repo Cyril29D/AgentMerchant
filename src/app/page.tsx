@@ -69,6 +69,22 @@ function BrandMark() {
   );
 }
 
+function formatEnrichedContentCount(
+  count: number,
+): string {
+  return count === 1
+    ? "1 contenu enrichi"
+    : `${count} contenus enrichis`;
+}
+
+function formatAnalyzedArticleCount(
+  count: number,
+): string {
+  return count === 1
+    ? "1 article analysé"
+    : `${count} articles analysés`;
+}
+
 export default function Home() {
   const [startDate, setStartDate] = useState(
     getTomorrowDateString(),
@@ -348,7 +364,9 @@ export default function Home() {
                   : "Mode dégradé"}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                {contentPlan.contextStatus.weatherContextCount} contenu(s) enrichi(s)
+                {formatEnrichedContentCount(
+                  contentPlan.contextStatus.weatherContextCount,
+                )}
               </p>
             </div>
 
@@ -360,7 +378,9 @@ export default function Home() {
                 Calendrier analysé
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                {contentPlan.contextStatus.calendarContextCount} contenu(s) enrichi(s)
+                {formatEnrichedContentCount(
+                  contentPlan.contextStatus.calendarContextCount,
+                )}
               </p>
             </div>
 
@@ -369,10 +389,14 @@ export default function Home() {
                 Agent actualités
               </p>
               <p className="mt-1 font-bold text-slate-900">
-                {contentPlan.contextStatus.newsCandidateCount} article(s) analysé(s)
+                {formatAnalyzedArticleCount(
+                  contentPlan.contextStatus.newsCandidateCount,
+                )}
               </p>
               <p className="mt-2 text-xs text-slate-500">
-                {contentPlan.contextStatus.newsContextCount} contenu(s) enrichi(s)
+                {formatEnrichedContentCount(
+                  contentPlan.contextStatus.newsContextCount,
+                )}
               </p>
             </div>
 

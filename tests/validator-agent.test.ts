@@ -178,6 +178,32 @@ test(
 );
 
 test(
+  "rejette une réputation non vérifiée",
+  () => {
+    const validation = validatePost(
+      createPost({
+        caption:
+          "Boulangerie Martin est le commerce préféré de Montpellier.",
+      }),
+      merchant,
+      photos,
+    );
+
+    assert.equal(
+      validation.status,
+      "rejected",
+    );
+    assert.ok(
+      validation.warnings.some((warning) =>
+        warning.includes(
+          "réputation non vérifiée",
+        ),
+      ),
+    );
+  },
+);
+
+test(
   "autorise la formule actualité locale sans allégation d’origine",
   () => {
     const validation = validatePost(

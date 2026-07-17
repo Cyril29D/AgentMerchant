@@ -363,9 +363,10 @@ export function buildEditorialDrafts(
         objective:
           `Présenter le service « ${service.name} »`,
         topic: service.name,
-        caption:
-          `Le service « ${service.name} » est disponible ` +
-          `chez ${merchant.name} à ${merchant.city}.`,
+        caption: normalize(service.name).includes("terrasse")
+          ? `${merchant.name} dispose d’une terrasse à ${merchant.city}.`
+          : `Découvrez le service « ${service.name} » proposé par ` +
+            `${merchant.name} à ${merchant.city}.`,
         evidence: [
           {
             sourceType: "service" as const,

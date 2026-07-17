@@ -287,6 +287,7 @@ export async function writeEditorialDrafts(
                 "N’affirme jamais qu’un service, une terrasse ou le commerce est ouvert sans preuve explicite liée au jour concerné.",
                 "N’utilise pas les expressions « pour tous les goûts », « large choix » ou « grande variété » sans preuve explicite.",
                 "N’utilise aucun adjectif qualitatif comme frais, délicieux, gourmand, confortable, exceptionnel ou unique sans preuve explicite.",
+                "N’affirme jamais que le commerce est incontournable, préféré, meilleur ou qu’il constitue un commerce de prédilection.",
                 "Ne dis pas « nous vous proposons » lorsqu’une preuve confirme seulement que le commerce vend un produit.",
                 "Ne répète pas la date de publication dans la légende sauf si elle est utile au contexte.",
                 "Rédige une publication sobre si tu ne disposes que du nom du produit.",
