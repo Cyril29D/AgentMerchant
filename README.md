@@ -15,6 +15,8 @@ Le système prend en compte :
 
 Chaque proposition est vérifiée avant son affichage afin de limiter les hallucinations et d’éviter l’invention de promotions, d’événements, de prix ou de services.
 
+![Interface AgentMerchant](docs/agentmerchant-interface.png)
+
 ## Démonstration
 
 Le projet utilise actuellement un commerce fictif :
@@ -56,6 +58,16 @@ Chaque publication reçoit un visuel sélectionné selon :
 * les images déjà utilisées.
 
 Le système privilégie un visuel inédit et pertinent pour chaque jour.
+
+Dans ce prototype, l’agent visuel n’analyse pas directement les pixels. Il
+classe les photos de façon déterministe à partir des catégories, descriptions
+et mots-clés renseignés dans la bibliothèque. Ce choix rend la démonstration
+explicable et reproductible, mais suppose que les métadonnées soient fiables.
+
+Avec une bibliothèque de plusieurs centaines de photos non catégorisées, une
+étape d’ingestion serait nécessaire : description et catégorisation initiales
+par un modèle de vision, indexation par embeddings, puis validation humaine des
+métadonnées avant leur utilisation par le moteur de sélection.
 
 ### Météo locale
 
@@ -307,6 +319,12 @@ Vérifier la qualité du code :
 pnpm lint
 ```
 
+Exécuter les tests unitaires du validateur :
+
+```bash
+pnpm test
+```
+
 Vérifier la compilation de production :
 
 ```bash
@@ -368,7 +386,8 @@ Ce projet est un prototype réalisé dans un temps limité.
 Ses principales limites sont :
 
 * le profil du commerçant est actuellement stocké dans un fichier JSON ;
-* les descriptions et catégories des photos sont renseignées manuellement ;
+* les descriptions et catégories des photos sont renseignées manuellement et
+  le moteur ne réalise pas encore d’analyse visuelle des pixels ;
 * la bibliothèque de démonstration contient un nombre limité d’images ;
 * le filtrage des actualités repose sur des mots-clés et des règles ;
 * le validateur anti-hallucination ne peut pas couvrir toutes les formulations possibles ;
@@ -377,7 +396,8 @@ Ses principales limites sont :
 * il n’existe pas encore d’authentification ;
 * les publications ne sont pas envoyées directement vers les réseaux sociaux ;
 * aucun historique de planning n’est conservé ;
-* les tests automatisés restent à compléter.
+* les tests automatisés couvrent les règles critiques du validateur, mais pas
+  encore les agents de contexte ni la route API complète.
 
 ## Améliorations envisagées
 
@@ -385,13 +405,15 @@ Une version plus avancée pourrait intégrer :
 
 * un formulaire complet de configuration du commerce ;
 * l’import et la gestion de plusieurs bibliothèques de photos ;
-* un modèle de vision pour décrire automatiquement les images ;
-* une recherche sémantique par embeddings pour sélectionner les visuels ;
+* un pipeline d’ingestion combinant vision, catégorisation automatique et
+  validation humaine des photos ;
+* une recherche sémantique par embeddings pour sélectionner les visuels dans
+  une bibliothèque volumineuse ;
 * une base PostgreSQL ;
 * un système d’authentification ;
 * un historique des plannings générés ;
 * une interface de modification et de validation humaine ;
-* des tests unitaires et d’intégration ;
+* une couverture de tests étendue aux agents de contexte et aux parcours API ;
 * une exécution avec Docker Compose ;
 * une intégration avec Instagram, Facebook ou LinkedIn ;
 * un système de publication programmée ;
