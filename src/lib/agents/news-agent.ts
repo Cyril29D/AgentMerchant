@@ -54,6 +54,10 @@ const REJECTED_NEWS_TERMS = [
   "braquage",
 ];
 
+const GENERIC_CONTEXT_TERMS = new Set([
+  "terrasse",
+]);
+
 function normalize(value: string): string {
   return value
     .normalize("NFD")
@@ -218,13 +222,28 @@ export function buildNewsContexts(
             ),
         );
 
-      if (matchingKeywords.length === 0) {
+      const specificMatchingKeywords =
+        matchingKeywords.filter(
+          (keyword) =>
+            !GENERIC_CONTEXT_TERMS.has(
+              keyword.term,
+            ),
+        );
+
+      /*
+       * Un mot générique comme « terrasse » ne suffit pas.
+       * L’article doit également parler du secteur du commerce
+       * ou d’un produit réellement vendu.
+       */
+      if (
+        specificMatchingKeywords.length === 0
+      ) {
         return [];
       }
 
       const uniqueLabels = [
         ...new Set(
-          matchingKeywords.map(
+          specificMatchingKeywords.map(
             (keyword) => keyword.label,
           ),
         ),
@@ -232,7 +251,7 @@ export function buildNewsContexts(
 
       const score =
         3 +
-        matchingKeywords.reduce(
+        specificMatchingKeywords.reduce(
           (total, keyword) =>
             total + keyword.weight,
           0,

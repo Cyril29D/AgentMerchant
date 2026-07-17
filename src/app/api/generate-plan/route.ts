@@ -230,6 +230,13 @@ export async function POST(
     const drafts =
       writerResult.drafts;
 
+    const deterministicDraftsByDay = new Map(
+      deterministicDrafts.map((draft) => [
+        draft.day,
+        draft,
+      ]),
+    );
+
     const usedPhotoIds = new Set<string>();
 
     const posts: ContentPost[] = drafts.map(
@@ -244,34 +251,70 @@ export async function POST(
           visualSelection.photo.id,
         );
 
-        const postWithoutValidation: Omit<
-          ContentPost,
-          "validation"
-        > = {
-          ...draft,
-          imageId: visualSelection.photo.id,
-          imagePath: visualSelection.photo.path,
-          imageReason: visualSelection.reason,
-          evidence: [
-            ...draft.evidence,
-            {
-              sourceType: "photo",
-              sourceId:
-                visualSelection.photo.id,
-              claim:
-                visualSelection.photo.description,
-            },
-          ],
+        const createValidatedPost = (
+          sourceDraft: typeof draft,
+        ): ContentPost => {
+          const postWithoutValidation: Omit<
+            ContentPost,
+            "validation"
+          > = {
+            ...sourceDraft,
+
+            imageId:
+              visualSelection.photo.id,
+
+            imagePath:
+              visualSelection.photo.path,
+
+            imageReason:
+              visualSelection.reason,
+
+            evidence: [
+              ...sourceDraft.evidence,
+              {
+                sourceType: "photo",
+                sourceId:
+                  visualSelection.photo.id,
+                claim:
+                  visualSelection.photo.description,
+              },
+            ],
+          };
+
+          return {
+            ...postWithoutValidation,
+
+            validation: validatePost(
+              postWithoutValidation,
+              merchant,
+              photos,
+            ),
+          };
         };
 
-        return {
-          ...postWithoutValidation,
-          validation: validatePost(
-            postWithoutValidation,
-            merchant,
-            photos,
-          ),
-        };
+        const generatedPost =
+          createValidatedPost(draft);
+
+        if (
+          generatedPost.validation.status ===
+            "approved" ||
+          writerResult.mode === "fallback"
+        ) {
+          return generatedPost;
+        }
+
+        const deterministicDraft =
+          deterministicDraftsByDay.get(
+            draft.day,
+          );
+
+        if (!deterministicDraft) {
+          return generatedPost;
+        }
+
+        return createValidatedPost(
+          deterministicDraft,
+        );
       },
     );
 

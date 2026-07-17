@@ -1,5 +1,3 @@
-import OpenAI from "openai";
-import { zodTextFormat } from "openai/helpers/zod";
 import { z } from "zod";
 
 import type { EditorialDraft } from "@/lib/agents/editorial-agent";
@@ -29,9 +27,21 @@ const GeneratedPlanSchema = z.object({
     .length(5),
 });
 
+const OllamaResponseSchema = z.object({
+  model: z.string(),
+
+  message: z.object({
+    role: z.string(),
+    content: z.string(),
+  }),
+
+  done: z.boolean().optional(),
+  done_reason: z.string().optional(),
+});
+
 export interface WriterResult {
   drafts: EditorialDraft[];
-  mode: "ai" | "fallback";
+  mode: "ollama" | "fallback";
   model: string | null;
   warning: string | null;
 }
@@ -76,6 +86,7 @@ function addMerchantEvidence(
 
   return drafts.map((draft) => ({
     ...draft,
+
     evidence: deduplicateEvidence([
       ...draft.evidence,
       merchantEvidence,
@@ -94,6 +105,7 @@ function buildPromptData(
         merchant.businessType,
       city: merchant.city,
       tone: merchant.tone,
+
       forbiddenClaims:
         merchant.forbiddenClaims,
     },
@@ -103,9 +115,6 @@ function buildPromptData(
       date: draft.date,
       objective: draft.objective,
       topic: draft.topic,
-
-      fallbackCaption:
-        draft.caption,
 
       allowedEvidence:
         draft.evidence.map(
@@ -119,92 +128,93 @@ function buildPromptData(
   };
 }
 
+interface GeneratedPostsValidation {
+  drafts: EditorialDraft[];
+  fallbackDays: number[];
+}
+
 function validateGeneratedPosts(
   drafts: EditorialDraft[],
   generatedPlan: z.infer<
     typeof GeneratedPlanSchema
   >,
-): EditorialDraft[] {
+): GeneratedPostsValidation {
   const generatedPostsByDay = new Map(
-    generatedPlan.posts.map(
-      (post) => [post.day, post],
-    ),
+    generatedPlan.posts.map((post) => [
+      post.day,
+      post,
+    ]),
   );
 
-  if (generatedPostsByDay.size !== 5) {
-    throw new Error(
-      "L’agent rédacteur n’a pas produit cinq jours uniques.",
-    );
-  }
+  const fallbackDays: number[] = [];
 
-  return drafts.map((draft) => {
+  const validatedDrafts = drafts.map((draft) => {
     const generatedPost =
       generatedPostsByDay.get(draft.day);
 
     if (!generatedPost) {
-      throw new Error(
-        `Aucun texte IA reçu pour le jour ${draft.day}.`,
-      );
+      fallbackDays.push(draft.day);
+      return draft;
     }
 
-    const allowedEvidenceIds =
-      new Set(
-        draft.evidence.map(
-          (evidence) =>
-            evidence.sourceId,
-        ),
+    const allowedEvidenceIds = new Set(
+      draft.evidence.map(
+        (evidence) => evidence.sourceId,
+      ),
+    );
+
+    const containsUnauthorizedEvidence =
+      generatedPost.usedEvidenceIds.some(
+        (evidenceId) =>
+          !allowedEvidenceIds.has(evidenceId),
       );
 
-    const usedEvidenceIds =
-      new Set(
-        generatedPost.usedEvidenceIds,
-      );
-
-    for (const evidenceId of usedEvidenceIds) {
-      if (
-        !allowedEvidenceIds.has(
-          evidenceId,
-        )
-      ) {
-        throw new Error(
-          `L’agent a utilisé une preuve non autorisée : ${evidenceId}.`,
-        );
-      }
+    if (containsUnauthorizedEvidence) {
+      fallbackDays.push(draft.day);
+      return draft;
     }
 
-    /*
-     * La première preuve est la preuve principale
-     * du sujet : produit, service ou commerce.
-     */
     const primaryEvidence =
       draft.evidence[0];
 
     if (
       primaryEvidence &&
-      !usedEvidenceIds.has(
+      !generatedPost.usedEvidenceIds.includes(
         primaryEvidence.sourceId,
       )
     ) {
-      throw new Error(
-        `La publication du jour ${draft.day} n’utilise pas sa preuve principale.`,
-      );
+      fallbackDays.push(draft.day);
+      return draft;
     }
 
+    const usedEvidenceIds = new Set(
+      generatedPost.usedEvidenceIds,
+    );
+
     const selectedEvidence =
-      draft.evidence.filter(
-        (evidence) =>
-          usedEvidenceIds.has(
-            evidence.sourceId,
-          ),
+      draft.evidence.filter((evidence) =>
+        usedEvidenceIds.has(
+          evidence.sourceId,
+        ),
       );
 
     return {
       ...draft,
-      caption:
-        generatedPost.caption.trim(),
+      caption: generatedPost.caption.trim(),
       evidence: selectedEvidence,
     };
   });
+
+  return {
+    drafts: validatedDrafts,
+    fallbackDays,
+  };
+}
+
+function normalizeBaseUrl(
+  value: string,
+): string {
+  return value.replace(/\/+$/, "");
 }
 
 export async function writeEditorialDrafts(
@@ -217,103 +227,172 @@ export async function writeEditorialDrafts(
       drafts,
     );
 
-  const apiKey =
-    process.env.OPENAI_API_KEY?.trim();
+  const baseUrl = normalizeBaseUrl(
+    process.env.OLLAMA_BASE_URL?.trim() ||
+      "http://127.0.0.1:11434",
+  );
 
   const model =
-    process.env.OPENAI_MODEL?.trim() ||
-    "gpt-5.6-luna";
+    process.env.OLLAMA_MODEL?.trim() ||
+    "llama3.2:3b";
 
-  if (!apiKey) {
-    return {
-      drafts: groundedDrafts,
-      mode: "fallback",
-      model: null,
-      warning:
-        "OPENAI_API_KEY absente : les textes déterministes ont été utilisés.",
-    };
-  }
+  const outputSchema =
+    z.toJSONSchema(
+      GeneratedPlanSchema,
+    );
 
   try {
-    const openai = new OpenAI({
-      apiKey,
-    });
+    const promptData = buildPromptData(
+      merchant,
+      groundedDrafts,
+    );
 
-    const response =
-      await openai.responses.parse({
-        model,
+    const response = await fetch(
+      `${baseUrl}/api/chat`,
+      {
+        method: "POST",
 
-        input: [
-          {
-            role: "system",
-            content: [
-              "Tu es l’agent rédacteur d’un système de communication pour commerces locaux.",
-              "Rédige exactement cinq publications en français.",
-              "Chaque publication doit contenir une ou deux phrases courtes et naturelles.",
-              "Adopte uniquement le ton demandé par le commerçant.",
-              "Tu dois utiliser exclusivement les faits présents dans allowedEvidence pour le jour concerné.",
-              "Le nom, le type d’activité et la ville du commerçant sont également autorisés.",
-              "N’invente jamais une offre, une promotion, un prix, un horaire, un événement, un produit, un service, une livraison ou une caractéristique.",
-              "N’affirme jamais qu’un produit est frais, fait maison, bio, local, préparé aujourd’hui ou disponible immédiatement sans preuve explicite.",
-              "Ne transforme pas une actualité en événement organisé par le commerce.",
-              "Si les preuves sont limitées, rédige une publication sobre plutôt que de compléter les informations.",
-              "Liste dans usedEvidenceIds toutes les preuves factuelles réellement utilisées.",
-              "La preuve principale du sujet doit obligatoirement être utilisée.",
-              "N’utilise ni Markdown ni liste.",
-            ].join(" "),
-          },
-          {
-            role: "user",
-            content: JSON.stringify(
-              buildPromptData(
-                merchant,
-                groundedDrafts,
-              ),
-              null,
-              2,
-            ),
-          },
-        ],
-
-        text: {
-          format: zodTextFormat(
-            GeneratedPlanSchema,
-            "merchant_content_plan",
-          ),
+        headers: {
+          "Content-Type":
+            "application/json",
+          Accept: "application/json",
         },
 
-        max_output_tokens: 2000,
-      });
+        signal:
+          AbortSignal.timeout(
+            120_000,
+          ),
 
-    const generatedPlan =
-      response.output_parsed;
+        body: JSON.stringify({
+          model,
 
-    if (!generatedPlan) {
+          messages: [
+            {
+              role: "system",
+
+              content: [
+                "Tu es l’agent rédacteur d’un système de communication pour commerces locaux.",
+                "Rédige exactement cinq publications en français.",
+                "Chaque publication contient une ou deux phrases courtes et naturelles.",
+                "Chaque publication doit être reformulée de manière originale et ne doit pas suivre un modèle répétitif.",
+                "Varie les débuts de phrases entre les cinq publications.",
+                "Respecte le ton indiqué par le commerçant.",
+                "Utilise exclusivement les faits disponibles dans allowedEvidence pour le jour concerné.",
+                "Chaque publication possède sa propre liste allowedEvidence.",
+                "N’utilise jamais une preuve provenant d’un autre jour.",
+                "Pour chaque jour, copie uniquement les identifiants présents dans la liste allowedEvidence de ce même jour.",
+                "Le nom, le type d’activité et la ville du commerçant sont autorisés uniquement lorsqu’ils figurent dans les preuves.",
+                "N’invente jamais une offre, une promotion, un prix, un horaire, un événement, un produit, un service ou une livraison.",
+                "N’affirme jamais qu’un produit est frais, fait maison, bio, local, préparé aujourd’hui ou disponible immédiatement sans preuve explicite.",
+                "N’affirme jamais qu’un service, une terrasse ou le commerce est ouvert sans preuve explicite liée au jour concerné.",
+                "N’utilise pas les expressions « pour tous les goûts », « large choix » ou « grande variété » sans preuve explicite.",
+                "N’utilise aucun adjectif qualitatif comme frais, délicieux, gourmand, confortable, exceptionnel ou unique sans preuve explicite.",
+                "Ne dis pas « nous vous proposons » lorsqu’une preuve confirme seulement que le commerce vend un produit.",
+                "Ne répète pas la date de publication dans la légende sauf si elle est utile au contexte.",
+                "Rédige une publication sobre si tu ne disposes que du nom du produit.",
+                "Ne transforme pas une actualité en événement organisé par le commerce.",
+                "Si les preuves sont limitées, rédige une publication sobre.",
+                "Liste dans usedEvidenceIds toutes les preuves factuelles réellement utilisées.",
+                "La preuve principale du sujet doit obligatoirement être utilisée.",
+                "Réponds uniquement avec le JSON demandé.",
+              ].join(" "),
+            },
+
+            {
+              role: "user",
+
+              content:
+                "Voici les données vérifiées :\n" +
+                JSON.stringify(
+                  promptData,
+                  null,
+                  2,
+                ) +
+                "\n\nVoici le schéma JSON obligatoire :\n" +
+                JSON.stringify(
+                  outputSchema,
+                  null,
+                  2,
+                ),
+            },
+          ],
+
+          stream: false,
+
+          format: outputSchema,
+
+          options: {
+            temperature: 0,
+            num_ctx: 8192,
+          },
+
+          keep_alive: "10m",
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const responseBody =
+        await response.text();
+
       throw new Error(
-        "Le modèle n’a retourné aucune réponse structurée.",
+        `Ollama a répondu avec le statut ` +
+        `${response.status} : ${responseBody}`,
       );
     }
 
-    const rewrittenDrafts =
+    const rawResponse =
+      (await response.json()) as unknown;
+
+    const ollamaResponse =
+      OllamaResponseSchema.parse(
+        rawResponse,
+      );
+
+    const parsedContent =
+      JSON.parse(
+        ollamaResponse.message.content,
+      ) as unknown;
+
+    const generatedPlan =
+      GeneratedPlanSchema.parse(
+        parsedContent,
+      );
+
+    const validationResult =
       validateGeneratedPosts(
         groundedDrafts,
         generatedPlan,
       );
 
+    const allPostsUsedFallback =
+      validationResult.fallbackDays.length ===
+      groundedDrafts.length;
+
+    const warning =
+      validationResult.fallbackDays.length > 0
+        ? `Les publications des jours ${
+            validationResult.fallbackDays.join(", ")
+          } ont été remplacées par leur version sécurisée.`
+        : null;
+
     return {
-      drafts: rewrittenDrafts,
-      mode: "ai",
-      model,
-      warning: null,
+      drafts: validationResult.drafts,
+      mode: allPostsUsedFallback
+        ? "fallback"
+        : "ollama",
+      model:
+        ollamaResponse.model || model,
+      warning,
     };
   } catch (error) {
     const message =
       error instanceof Error
         ? error.message
-        : "Erreur IA inconnue.";
+        : "Erreur Ollama inconnue.";
 
     console.warn(
-      "AI writer failed:",
+      "Local AI writer failed:",
       error,
     );
 
@@ -322,7 +401,7 @@ export async function writeEditorialDrafts(
       mode: "fallback",
       model,
       warning:
-        `L’agent rédacteur IA a échoué : ${message} ` +
+        `Le rédacteur Ollama a échoué : ${message} ` +
         "Les textes déterministes ont été utilisés.",
     };
   }

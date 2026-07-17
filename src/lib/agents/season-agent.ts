@@ -153,7 +153,11 @@ export function buildCalendarContexts(
 
     if (
       terraceAvailable &&
-      outdoorSeason
+      outdoorSeason &&
+      isMerchantOpen(
+        merchant,
+        calendarDay,
+      )
     ) {
       const claim = getSeasonSummary(
         calendarDay.season,

@@ -75,7 +75,7 @@ export const ContextStatusSchema = z.object({
     .min(0),
 
   writer: z.enum([
-    "ai",
+    "ollama",
     "fallback",
   ]),
 

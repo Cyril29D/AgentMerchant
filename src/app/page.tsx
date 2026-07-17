@@ -237,22 +237,18 @@ export default function Home() {
               <span
                 className={
                   contentPlan.contextStatus.writer ===
-                  "ai"
+                  "ollama"
                     ? "rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-800"
                     : "rounded-full bg-zinc-200 px-3 py-1 font-medium text-zinc-700"
                 }
               >
                 Rédaction :{" "}
                 {contentPlan.contextStatus.writer ===
-                "ai"
-                  ? `IA${
+                "ollama"
+                  ? `IA locale · ${
                       contentPlan.contextStatus
-                        .writerModel
-                        ? ` · ${
-                            contentPlan.contextStatus
-                              .writerModel
-                          }`
-                        : ""
+                        .writerModel ??
+                      "Ollama"
                     }`
                   : "mode de secours"}
               </span>

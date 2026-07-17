@@ -37,7 +37,27 @@ const RISKY_CLAIMS: RiskyClaim[] = [
   {
     label: "fraîcheur",
     pattern:
-      /\bfrais(?:e|es)?\b/,
+      /\b(?:frais|fraiche|fraiches)\b/,
+  },
+  {
+    label: "qualité gustative",
+    pattern:
+      /\b(?:delicieux|delicieuse|delicieuses|savoureux|savoureuse|gourmand|gourmande)\b/,
+  },
+  {
+    label: "confort",
+    pattern:
+      /\b(?:confortable|confortables)\b/,
+  },
+  {
+    label: "expérience unique",
+    pattern:
+      /\b(?:experience unique|shopping unique)\b/,
+  },
+  {
+    label: "variété de produits",
+    pattern:
+      /\b(?:pour tous les gouts|large choix|grand choix|vaste choix|grande variete)\b/,
   },
   {
     label: "produit biologique",
@@ -52,7 +72,7 @@ const RISKY_CLAIMS: RiskyClaim[] = [
   {
     label: "origine locale",
     pattern:
-      /\blocal(?:e|es|aux)?\b/,
+      /\b(?:produit(?:s)? local(?:e|es|aux)?|ingredient(?:s)? local(?:e|es|aux)?|origine locale|fabrication locale|circuit court)\b/,
   },
   {
     label: "produit végan",
@@ -65,6 +85,60 @@ const RISKY_CLAIMS: RiskyClaim[] = [
       /\bhalal\b/,
   },
 ];
+
+function isMerchantOpenOnDate(
+  merchant: Merchant,
+  date: string,
+): boolean {
+  const parsedDate = new Date(
+    `${date}T12:00:00`,
+  );
+
+  if (
+    Number.isNaN(parsedDate.getTime())
+  ) {
+    return false;
+  }
+
+  const openingHoursKeys = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ];
+
+  const openingHoursKey =
+    openingHoursKeys[
+      parsedDate.getDay()
+    ];
+
+  if (!openingHoursKey) {
+    return false;
+  }
+
+  const openingHours =
+    merchant.openingHours[
+      openingHoursKey
+    ];
+
+  if (!openingHours) {
+    return false;
+  }
+
+  const normalizedOpeningHours =
+    normalizeText(openingHours);
+
+  return ![
+    "closed",
+    "ferme",
+    "fermee",
+  ].includes(
+    normalizedOpeningHours,
+  );
+}
 
 export function validatePost(
   post: Omit<ContentPost, "validation">,
@@ -129,6 +203,23 @@ export function validatePost(
 
   const normalizedGeneratedCaption =
     normalizeText(post.caption);
+
+  const claimsThatCommerceIsOpen =
+    /\b(?:ouvert|ouverte|ouverts|ouvertes)\b/.test(
+      normalizedGeneratedCaption,
+    );
+
+  if (
+    claimsThatCommerceIsOpen &&
+    !isMerchantOpenOnDate(
+      merchant,
+      post.date,
+    )
+  ) {
+    warnings.push(
+      "La publication affirme que le commerce ou un service est ouvert alors que les horaires indiquent une fermeture.",
+    );
+  }
 
   const hasVerifiedPromotion = merchant.promotions.some(
     (promotion) => promotion.verified,
