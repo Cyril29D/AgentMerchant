@@ -210,7 +210,7 @@ AgentMerchant/
 
 Avant de lancer le projet, installez :
 
-* Node.js 20 ou une version plus récente ;
+* Node.js 22 ou une version plus récente ;
 * pnpm ;
 * Ollama ;
 * Git.
